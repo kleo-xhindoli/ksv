@@ -1,47 +1,78 @@
-use std::fs;
-use tabled::{builder::Builder, Table};
+use std::{
+    error::Error,
+    fs::File,
+    io::{self, Stdin},
+    process,
+};
 
-pub struct CSV<'a> {
-    headers: Vec<&'a str>,
-    rows: Vec<Vec<&'a str>>,
+use tabled::builder::Builder;
+
+pub struct CSV<T: io::Read> {
+    reader: csv::Reader<T>,
 }
 
-impl<'a> CSV<'a> {
-    pub fn parse(csv: &'a str, delimiter: Option<char>) -> Self {
-        let delimiter = delimiter.unwrap_or(',');
+impl<T: io::Read> CSV<T> {
+    pub fn print_csv(&mut self) -> Result<(), Box<dyn Error>> {
+        let mut wtr = csv::Writer::from_writer(io::stdout());
 
-        let mut lines = csv.lines();
-        let headers: Vec<&str> = lines.next().unwrap_or("").split(delimiter).collect();
-        let rows: Vec<Vec<&str>> = lines
-            .map(|line: &str| line.split(delimiter).map(|el| el.trim()).collect())
-            .collect();
+        wtr.write_record(self.reader.headers()?)?;
 
-        CSV { headers, rows }
+        for result in self.reader.records() {
+            let record = result?;
+            wtr.write_record(&record)?;
+        }
+
+        wtr.flush()?;
+        Ok(())
     }
 
-    pub fn to_csv_string(&self, delimiter: Option<char>) -> String {
-        let delimiter = &delimiter.unwrap_or(',').to_string();
-        let headers = self.headers.join(delimiter);
-        let rows = self
-            .rows
-            .iter()
-            .map(|row| row.join(delimiter))
-            .collect::<Vec<String>>()
-            .join("\n");
+    pub fn print_table(&mut self) -> Result<(), Box<dyn Error>> {
+        let records: Vec<csv::StringRecord> = self.reader.records().map(|r| r.unwrap()).collect();
+        let headers = self.reader.headers()?;
 
-        (vec![headers, rows]).join("\n")
+        let table = Builder::from_iter(&records).set_header(headers).build();
+
+        println!("{}", table);
+
+        Ok(())
     }
 
-    pub fn to_table(&self) -> Table {
-        Builder::from_iter(&self.rows)
-            .set_header(&self.headers)
-            .build()
+    pub fn count(&mut self) -> usize {
+        self.reader.records().count()
+    }
+
+    pub fn print_headers(&mut self) -> Result<(), Box<dyn Error>> {
+        let headers = self.reader.headers()?;
+
+        for (i, header) in headers.into_iter().enumerate() {
+            println!("{}. {}", i, header);
+        }
+
+        Ok(())
+    }
+}
+
+impl CSV<Stdin> {
+    pub fn from_stdin() -> Self {
+        let reader = csv::Reader::from_reader(io::stdin());
+
+        CSV { reader }
+    }
+}
+
+impl CSV<File> {
+    pub fn from_file(path: &str) -> Self {
+        let reader = csv::Reader::from_path(path).unwrap();
+
+        CSV { reader }
     }
 }
 
 fn main() {
-    let csv = fs::read_to_string("test-data.csv").unwrap();
-    let csv = CSV::parse(&csv, None);
+    let mut data = CSV::from_stdin();
 
-    println!("{}", csv.to_table());
+    if let Err(e) = data.print_table() {
+        println!("{}", e);
+        process::exit(1);
+    }
 }
