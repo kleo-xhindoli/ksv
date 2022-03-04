@@ -33,19 +33,6 @@ impl CSV {
         }
     }
 
-    pub fn print_csv(&self) -> Result<(), Box<dyn Error>> {
-        let mut wtr = csv::Writer::from_writer(io::stdout());
-
-        wtr.write_record(&self.headers)?;
-
-        for record in self.records.iter() {
-            wtr.write_record(record)?;
-        }
-
-        wtr.flush()?;
-        Ok(())
-    }
-
     pub fn sample(&mut self, count: usize) -> &Self {
         let mut sample: Vec<csv::StringRecord> = Vec::new();
         let mut rng = rand::thread_rng();
@@ -60,6 +47,23 @@ impl CSV {
         self
     }
 
+    pub fn count(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn print_csv(&self) -> Result<(), Box<dyn Error>> {
+        let mut wtr = csv::Writer::from_writer(io::stdout());
+
+        wtr.write_record(&self.headers)?;
+
+        for record in self.records.iter() {
+            wtr.write_record(record)?;
+        }
+
+        wtr.flush()?;
+        Ok(())
+    }
+
     pub fn print_table(&self) -> Result<(), Box<dyn Error>> {
         let table = Builder::from_iter(&self.records)
             .set_header(&self.headers)
@@ -68,10 +72,6 @@ impl CSV {
         println!("{}", table);
 
         Ok(())
-    }
-
-    pub fn count(&self) -> usize {
-        self.records.len()
     }
 
     pub fn print_headers(&self) -> Result<(), Box<dyn Error>> {
