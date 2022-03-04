@@ -51,6 +51,18 @@ impl CSV {
         self.records.len()
     }
 
+    pub fn search(&mut self, query: &str) -> &Self {
+        let matches: Vec<csv::StringRecord> = self
+            .records
+            .iter()
+            .filter(|r| r.as_slice().contains(&query.to_lowercase()))
+            .map(|r| r.to_owned())
+            .collect();
+
+        self.records = matches;
+        self
+    }
+
     pub fn print_csv(&self) -> Result<(), Box<dyn Error>> {
         let mut wtr = csv::Writer::from_writer(io::stdout());
 

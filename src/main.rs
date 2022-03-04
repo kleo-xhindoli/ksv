@@ -17,6 +17,7 @@ enum Commands {
     Count { csv: Option<String> },
     Headers { csv: Option<String> },
     Sample { count: usize, csv: Option<String> },
+    Search { query: String, csv: Option<String> },
 }
 
 fn main() {
@@ -49,6 +50,14 @@ fn main() {
             let mut data = CSV::new(csv).unwrap();
 
             if let Err(e) = data.sample(count).print_csv() {
+                println!("{}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Search { query, csv } => {
+            let mut data = CSV::new(csv).unwrap();
+
+            if let Err(e) = data.search(&query).print_csv() {
                 println!("{}", e);
                 process::exit(1);
             }
