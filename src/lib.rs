@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::prelude::IteratorRandom;
 use std::{error::Error, io};
 
 use tabled::builder::Builder;
@@ -34,14 +34,14 @@ impl CSV {
     }
 
     pub fn sample(&mut self, count: usize) -> &Self {
-        let mut sample: Vec<csv::StringRecord> = Vec::new();
         let mut rng = rand::thread_rng();
-
-        for _ in 0..count {
-            let i = rng.gen_range(1..self.count());
-            let r = self.records.get(i).unwrap().clone();
-            sample.push(r);
-        }
+        let sample: Vec<csv::StringRecord> = self
+            .records
+            .iter()
+            .choose_multiple(&mut rng, count)
+            .into_iter()
+            .map(|x| x.clone())
+            .collect();
 
         self.records = sample;
         self
