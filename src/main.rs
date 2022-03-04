@@ -1,78 +1,57 @@
-use std::{
-    error::Error,
-    fs::File,
-    io::{self, Stdin},
-    process,
-};
+use std::process;
 
-use tabled::builder::Builder;
+use clap::{Parser, Subcommand};
+use ksv::CSV;
 
-pub struct CSV<T: io::Read> {
-    reader: csv::Reader<T>,
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+#[clap(propagate_version = true)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
 }
 
-impl<T: io::Read> CSV<T> {
-    pub fn print_csv(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut wtr = csv::Writer::from_writer(io::stdout());
-
-        wtr.write_record(self.reader.headers()?)?;
-
-        for result in self.reader.records() {
-            let record = result?;
-            wtr.write_record(&record)?;
-        }
-
-        wtr.flush()?;
-        Ok(())
-    }
-
-    pub fn print_table(&mut self) -> Result<(), Box<dyn Error>> {
-        let records: Vec<csv::StringRecord> = self.reader.records().map(|r| r.unwrap()).collect();
-        let headers = self.reader.headers()?;
-
-        let table = Builder::from_iter(&records).set_header(headers).build();
-
-        println!("{}", table);
-
-        Ok(())
-    }
-
-    pub fn count(&mut self) -> usize {
-        self.reader.records().count()
-    }
-
-    pub fn print_headers(&mut self) -> Result<(), Box<dyn Error>> {
-        let headers = self.reader.headers()?;
-
-        for (i, header) in headers.into_iter().enumerate() {
-            println!("{}. {}", i, header);
-        }
-
-        Ok(())
-    }
-}
-
-impl CSV<Stdin> {
-    pub fn from_stdin() -> Self {
-        let reader = csv::Reader::from_reader(io::stdin());
-
-        CSV { reader }
-    }
-}
-
-impl CSV<File> {
-    pub fn from_file(path: &str) -> Self {
-        let reader = csv::Reader::from_path(path).unwrap();
-
-        CSV { reader }
-    }
+#[derive(Subcommand)]
+enum Commands {
+    Table { csv: Option<String> },
+    Count { csv: Option<String> },
+    Headers { csv: Option<String> },
+    Sample { count: usize, csv: Option<String> },
 }
 
 fn main() {
-    let mut data = CSV::from_stdin();
+    let cli = Cli::parse();
 
-    if let Err(e) = data.print_table() {
-        println!("{}", e);
-        process::exit(1);
+    match cli.command {
+        Commands::Table { csv } => {
+            let data = CSV::new(csv).unwrap();
+
+            if let Err(e) = data.print_table() {
+                println!("{}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Count { csv } => {
+            let data = CSV::new(csv).unwrap();
+
+            let c = data.count();
+            println!("{}", c);
+        }
+        Commands::Headers { csv } => {
+            let data = CSV::new(csv).unwrap();
+
+            if let Err(e) = data.print_headers() {
+                println!("{}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Sample { count, csv } => {
+            let mut data = CSV::new(csv).unwrap();
+
+            if let Err(e) = data.sample(count).print_csv() {
+                println!("{}", e);
+                process::exit(1);
+            }
+        }
     }
 }
